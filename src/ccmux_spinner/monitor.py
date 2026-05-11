@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from . import config
 from .errors import PaneCaptureError
-from .pane import capture_pane, resolve_pane_id
+from .pane import capture_pane
 from .parser import Activity, parse_pane
 
 if TYPE_CHECKING:
@@ -16,11 +16,16 @@ if TYPE_CHECKING:
 
 
 class SpinnerMonitor:
-    """Watch one Claude Code tmux session's pane and yield Activity changes.
+    """Watch one tmux pane and yield :data:`Activity` changes.
+
+    The monitor takes an explicit ``pane_id`` (e.g. ``%42``). Callers
+    that have only a tmux session name can use
+    :func:`ccmux_spinner.resolve_active_pane_id` to obtain the pane id
+    first.
 
     Usage::
 
-        async with SpinnerMonitor("my-session") as mon:
+        async with SpinnerMonitor("%42") as mon:
             async for activity in mon:
                 handle(activity)
 
@@ -35,14 +40,13 @@ class SpinnerMonitor:
 
     def __init__(
         self,
-        tmux_session: str,
+        pane_id: str,
         poll_interval: float | None = None,
     ) -> None:
-        self._tmux_session = tmux_session
+        self._pane_id = pane_id
         self._poll_interval = (
             poll_interval if poll_interval is not None else config.poll_interval()
         )
-        self._pane_id: str = ""
         self._stop_event: asyncio.Event | None = None
         self._queue: asyncio.Queue[Activity] | None = None
         self._poll_task: asyncio.Task | None = None
@@ -50,8 +54,6 @@ class SpinnerMonitor:
         self._first_yield_done = False
 
     async def __aenter__(self) -> SpinnerMonitor:
-        # resolve_pane_id may raise TmuxResolutionError; let it bubble.
-        self._pane_id = resolve_pane_id(self._tmux_session)
         self._stop_event = asyncio.Event()
         self._queue = asyncio.Queue()
         self._poll_task = asyncio.create_task(self._poll_loop())
