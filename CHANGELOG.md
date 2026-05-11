@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-05-10
+
+### Changed (BREAKING)
+
+- `SpinnerMonitor(tmux_session: str)` is now
+  `SpinnerMonitor(pane_id: str)`. Callers must pass the tmux pane id
+  directly. Use the new `resolve_active_pane_id(tmux_session)` helper
+  if you need to resolve from a session name.
+- `resolve_pane_id(tmux_session: str) -> str` is **removed**.
+  Replacement: `resolve_active_pane_id(tmux_session: str) -> str`,
+  which prefers the **active** pane (no `:0` window suffix) and
+  falls back to window 0's first pane when the active lookup is
+  empty or fails. The old behavior of hard-coding window 0 was a
+  bug for any session with multiple windows.
+
+### Added
+
+- `resolve_active_pane_id` is exported from the top-level
+  `ccmux_spinner` package as a public helper.
+
+### Migration
+
+`ccmux-spinner` v0.1 had no published consumers. Internal call
+sites (the `ccmux-spinner watch` CLI and the test suite) are
+updated in this release. Downstream packages (notably
+`ccmux-core` v0.1) declare `ccmux-spinner >= 0.2.0`.
+
 ## [0.1.1] - 2026-05-10
 
 ### Fixed

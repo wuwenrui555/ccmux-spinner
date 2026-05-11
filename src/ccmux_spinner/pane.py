@@ -99,39 +99,44 @@ def has_input_chrome(lines: list[str]) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def resolve_pane_id(tmux_session: str) -> str:
-    """Look up the pane id of window 0 in *tmux_session*.
+def resolve_active_pane_id(tmux_session: str) -> str:
+    """Return the active pane id of *tmux_session*.
 
-    Raises :class:`TmuxResolutionError` when the binary is missing,
-    the session does not exist, or window 0 has no pane.
+    Resolution order:
+      1. ``tmux display-message -t <tmux_session> -p '#{pane_id}'``
+         (no window suffix → tmux returns the active pane).
+      2. Fallback: same command with ``:0`` suffix, returning window 0's
+         first pane, if step 1 produced empty output or a non-zero
+         exit.
+
+    Raises :class:`TmuxResolutionError` when the binary is missing, the
+    session does not exist, or neither lookup yields a pane id.
     """
-    try:
-        result = subprocess.run(
-            [
-                "tmux",
-                "display-message",
-                "-t",
-                f"{tmux_session}:0",
-                "-p",
-                "#{pane_id}",
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except FileNotFoundError as e:
-        raise TmuxResolutionError(f"tmux binary not on PATH: {e}") from e
-    if result.returncode != 0:
-        raise TmuxResolutionError(
-            f"tmux display-message failed for session "
-            f"{tmux_session!r}: {result.stderr.strip()}"
-        )
-    pane_id = result.stdout.strip()
-    if not pane_id:
-        raise TmuxResolutionError(
-            f"tmux returned empty pane_id for session {tmux_session!r}"
-        )
-    return pane_id
+
+    def _query(target: str) -> tuple[int, str, str]:
+        try:
+            result = subprocess.run(
+                ["tmux", "display-message", "-t", target, "-p", "#{pane_id}"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except FileNotFoundError as e:
+            raise TmuxResolutionError(f"tmux binary not on PATH: {e}") from e
+        return result.returncode, result.stdout.strip(), result.stderr.strip()
+
+    rc, pane_id, err = _query(tmux_session)
+    if rc == 0 and pane_id:
+        return pane_id
+
+    rc2, pane_id2, err2 = _query(f"{tmux_session}:0")
+    if rc2 == 0 and pane_id2:
+        return pane_id2
+
+    detail = f"active lookup: rc={rc} err={err!r}; :0 lookup: rc={rc2} err={err2!r}"
+    raise TmuxResolutionError(
+        f"could not resolve a pane id for session {tmux_session!r}; {detail}"
+    )
 
 
 def capture_pane(pane_id: str) -> str:
