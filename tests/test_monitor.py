@@ -168,3 +168,96 @@ async def test_monitor_idle_decoration_then_spinner():
             await asyncio.wait_for(consumer(), timeout=1.0)
             assert isinstance(received[0], IdleDecoration)
             assert isinstance(received[1], Spinner)
+
+
+# ---------------------------------------------------------------------------
+# `current` and `last_pane_change_at` properties (v0.2.1)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_current_reflects_latest_parse():
+    """SpinnerMonitor.current returns the most recent classified Activity,
+    even when coalescing means it was not emitted."""
+    same = _pane("✻ Thinking… (3s)")
+    with (
+        patch("ccmux_spinner.monitor.capture_pane", return_value=same),
+    ):
+        async with SpinnerMonitor("%1", poll_interval=0.02) as mon:
+            await asyncio.sleep(0.1)  # let several polls happen
+            assert isinstance(mon.current, Spinner)
+            assert mon.current.text == "Thinking… (3s)"
+
+
+@pytest.mark.asyncio
+async def test_last_pane_change_at_updates_when_pane_changes():
+    panes = [
+        _pane("✻ Thinking… (3s)"),
+        _pane("✻ Thinking… (4s)"),
+        _pane("✻ Thinking… (5s)"),
+    ]
+    idx = {"i": 0}
+
+    def fake_capture(_pane_id: str) -> str:
+        i = idx["i"]
+        idx["i"] = min(i + 1, len(panes) - 1)
+        return panes[i]
+
+    with (
+        patch("ccmux_spinner.monitor.capture_pane", side_effect=fake_capture),
+    ):
+        async with SpinnerMonitor("%1", poll_interval=0.02) as mon:
+            await asyncio.sleep(0.01)
+            t1 = mon.last_pane_change_at
+            assert t1 > 0
+            await asyncio.sleep(0.1)  # let more polls happen
+            t2 = mon.last_pane_change_at
+            assert t2 > t1, "last_pane_change_at should advance when pane changes"
+
+
+@pytest.mark.asyncio
+async def test_last_pane_change_at_stable_when_pane_unchanged():
+    """Pane text identical poll after poll → last_pane_change_at frozen."""
+    same = _pane("✻ Thinking… (constant)")
+    with (
+        patch("ccmux_spinner.monitor.capture_pane", return_value=same),
+    ):
+        async with SpinnerMonitor("%1", poll_interval=0.02) as mon:
+            await asyncio.sleep(0.01)
+            t1 = mon.last_pane_change_at
+            assert t1 > 0
+            await asyncio.sleep(0.15)  # plenty of polls, but pane never changes
+            t2 = mon.last_pane_change_at
+            assert t2 == t1, (
+                "last_pane_change_at must not advance while raw pane text is unchanged"
+            )
+
+
+@pytest.mark.asyncio
+async def test_current_is_none_before_first_poll():
+    """Before the poll loop has captured anything, current is None and
+    last_pane_change_at is 0."""
+    mon = SpinnerMonitor("%1", poll_interval=0.02)
+    assert mon.current is None
+    assert mon.last_pane_change_at == 0.0
+
+
+@pytest.mark.asyncio
+async def test_current_tracks_transition_to_idle_decoration():
+    panes = [
+        _pane("✻ Thinking… (3s)"),
+        _pane("✻ Churned for 12s"),
+    ]
+    idx = {"i": 0}
+
+    def fake_capture(_pane_id: str) -> str:
+        i = idx["i"]
+        idx["i"] = min(i + 1, len(panes) - 1)
+        return panes[i]
+
+    with (
+        patch("ccmux_spinner.monitor.capture_pane", side_effect=fake_capture),
+    ):
+        async with SpinnerMonitor("%1", poll_interval=0.02) as mon:
+            await asyncio.sleep(0.1)
+            assert isinstance(mon.current, IdleDecoration)

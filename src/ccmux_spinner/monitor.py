@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
 
@@ -52,6 +53,16 @@ class SpinnerMonitor:
         self._poll_task: asyncio.Task | None = None
         self._last: Activity = None
         self._first_yield_done = False
+        # Raw-pane-text change tracking, exposed via the
+        # ``last_pane_change_at`` property. Consumers downstream
+        # (notably ccmux-core's grace timer) use this to distinguish
+        # "spinner is absent because pane is streaming new content"
+        # (pane changes ⇒ refresh) from "spinner is absent and pane
+        # is static" (the only thing left to fire interrupted on).
+        # The Activity-emit stream alone cannot disambiguate these
+        # because Activity coalesces unchanged classifications.
+        self._last_pane_text: str | None = None
+        self._last_pane_change_at: float = 0.0
 
     async def __aenter__(self) -> SpinnerMonitor:
         self._stop_event = asyncio.Event()
@@ -75,6 +86,33 @@ class SpinnerMonitor:
                 return
             yield item
 
+    @property
+    def current(self) -> Activity:
+        """Latest classified :data:`Activity` from the poll loop.
+
+        Reflects the most recent ``parse_pane`` result regardless of
+        whether it was emitted to the iterator (coalescing skips
+        repeated classifications). ``None`` until the first poll
+        completes. Useful for one-shot queries that need the *current*
+        state, not the next *change*.
+        """
+        return self._last
+
+    @property
+    def last_pane_change_at(self) -> float:
+        """Unix epoch of the most recent poll where raw pane text
+        differed from the previous poll.
+
+        ``0.0`` until the first poll completes. After that, the value
+        only advances when the raw captured text actually changes,
+        which is a finer-grained signal than Activity-change emission
+        (Activity coalesces; raw text comparison does not).
+
+        Consumers can use ``time.time() - last_pane_change_at`` to
+        decide whether the pane has been static for a while.
+        """
+        return self._last_pane_change_at
+
     async def _poll_loop(self) -> None:
         assert self._stop_event is not None
         assert self._queue is not None
@@ -88,6 +126,8 @@ class SpinnerMonitor:
                 await self._queue.put(None)
                 await self._queue.put(_DONE)  # type: ignore[arg-type]
                 return
+            self._last_pane_text = pane_text
+            self._last_pane_change_at = time.time()
             current = parse_pane(pane_text)
             self._last = current
             await self._queue.put(current)
@@ -107,6 +147,9 @@ class SpinnerMonitor:
                     await self._queue.put(None)
                     await self._queue.put(_DONE)  # type: ignore[arg-type]
                     return
+                if pane_text != self._last_pane_text:
+                    self._last_pane_text = pane_text
+                    self._last_pane_change_at = time.time()
                 current = parse_pane(pane_text)
                 if current != self._last:
                     self._last = current
