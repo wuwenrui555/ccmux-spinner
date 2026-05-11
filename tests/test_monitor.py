@@ -24,10 +24,9 @@ async def test_monitor_yields_initial_snapshot():
     panes = iter([_pane("✻ Thinking… (3s)"), _pane("✻ Thinking… (3s)")])
 
     with (
-        patch("ccmux_spinner.monitor.resolve_pane_id", return_value="%1"),
         patch("ccmux_spinner.monitor.capture_pane", side_effect=lambda _: next(panes)),
     ):
-        async with SpinnerMonitor("s", poll_interval=0.05) as mon:
+        async with SpinnerMonitor("%1", poll_interval=0.05) as mon:
             received = []
 
             async def consumer():
@@ -45,10 +44,9 @@ async def test_monitor_coalesces_repeated_snapshots():
     """Yields on change only — repeated identical pane text → 1 yield."""
     same = _pane("✻ Thinking… (3s)")
     with (
-        patch("ccmux_spinner.monitor.resolve_pane_id", return_value="%1"),
         patch("ccmux_spinner.monitor.capture_pane", return_value=same),
     ):
-        async with SpinnerMonitor("s", poll_interval=0.02) as mon:
+        async with SpinnerMonitor("%1", poll_interval=0.02) as mon:
             received = []
 
             async def consumer():
@@ -80,10 +78,9 @@ async def test_monitor_emits_change():
         return panes[i]
 
     with (
-        patch("ccmux_spinner.monitor.resolve_pane_id", return_value="%1"),
         patch("ccmux_spinner.monitor.capture_pane", side_effect=fake_capture),
     ):
-        async with SpinnerMonitor("s", poll_interval=0.02) as mon:
+        async with SpinnerMonitor("%1", poll_interval=0.02) as mon:
             received = []
 
             async def consumer():
@@ -108,10 +105,9 @@ async def test_monitor_terminates_on_pane_capture_error():
         raise PaneCaptureError("pane gone")
 
     with (
-        patch("ccmux_spinner.monitor.resolve_pane_id", return_value="%1"),
         patch("ccmux_spinner.monitor.capture_pane", side_effect=fake_capture),
     ):
-        async with SpinnerMonitor("s", poll_interval=0.02) as mon:
+        async with SpinnerMonitor("%1", poll_interval=0.02) as mon:
             received = []
 
             async def consumer():
@@ -126,13 +122,12 @@ async def test_monitor_terminates_on_pane_capture_error():
 @pytest.mark.asyncio
 async def test_monitor_initial_pane_capture_error_terminates_immediately():
     with (
-        patch("ccmux_spinner.monitor.resolve_pane_id", return_value="%1"),
         patch(
             "ccmux_spinner.monitor.capture_pane",
             side_effect=PaneCaptureError("immediate"),
         ),
     ):
-        async with SpinnerMonitor("s", poll_interval=0.02) as mon:
+        async with SpinnerMonitor("%1", poll_interval=0.02) as mon:
             received = []
 
             async def consumer():
@@ -159,10 +154,9 @@ async def test_monitor_idle_decoration_then_spinner():
         return panes[i]
 
     with (
-        patch("ccmux_spinner.monitor.resolve_pane_id", return_value="%1"),
         patch("ccmux_spinner.monitor.capture_pane", side_effect=fake_capture),
     ):
-        async with SpinnerMonitor("s", poll_interval=0.02) as mon:
+        async with SpinnerMonitor("%1", poll_interval=0.02) as mon:
             received = []
 
             async def consumer():

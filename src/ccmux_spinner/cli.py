@@ -42,6 +42,7 @@ from datetime import UTC, datetime
 from . import __version__, config
 from .errors import PaneCaptureError, TmuxResolutionError
 from .monitor import SpinnerMonitor
+from .pane import resolve_active_pane_id
 from .parser import Spinner
 
 _PRETTY_TRUNCATION_MARKER = "..."
@@ -152,7 +153,8 @@ def _activity_to_json(activity) -> str:
 
 async def _watch_async(args) -> int:
     try:
-        async with SpinnerMonitor(args.session) as mon:
+        pane_id = resolve_active_pane_id(args.session)
+        async with SpinnerMonitor(pane_id) as mon:
             async for activity in mon:
                 if args.json:
                     print(_activity_to_json(activity), flush=True)
