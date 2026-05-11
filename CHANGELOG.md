@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-05-10
+
+### Fixed
+
+- `parse_pane`: require a whitespace character after the spinner
+  glyph before classifying. Without this, any line beginning with
+  one of the spinner glyphs would match — most notably a markdown
+  `**bold**` line streamed into the terminal during a turn would
+  render above the chrome and get mis-classified as an
+  `IdleDecoration` (because the leading `*` is a spinner glyph in
+  CC's 5-frame cycle, but a markdown bold's second char is another
+  `*`, not whitespace). The new check also rejects `*item` /
+  `··` / similar artifacts. Real status rows are always
+  `<glyph> <body>` with a space between, so this discriminator
+  is exact.
+
 ## [0.1.0] - 2026-05-10
 
 ### Added

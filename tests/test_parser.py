@@ -145,6 +145,33 @@ def test_spinner_with_no_todos_has_empty_tuple():
     assert out.todos == ()
 
 
+def test_markdown_bold_above_chrome_not_spinner():
+    """A ``**bold**`` markdown line rendered above chrome must NOT be classified.
+
+    Regression test: ``*`` is in ``_STATUS_SPINNERS`` (because CC's
+    5-frame cycle includes it), but markdown-bold lines start with
+    ``*`` too. We require the glyph to be followed by whitespace to
+    discriminate.
+    """
+    pane = _pane("**第一件事：验证 Esc 是否 fire stop hook**。")
+    assert parse_pane(pane) is None
+
+
+def test_bullet_list_above_chrome_not_spinner():
+    """``* item`` (no leading space) is also rejected."""
+    # Note: ``* item`` strips to ``* item`` and stripped[1]==' ', so it
+    # WOULD match. The case we reject is ``*item`` (no space) and
+    # ``**bold**`` (second char is also ``*``). Verify both.
+    pane = _pane("*item")
+    assert parse_pane(pane) is None
+
+
+def test_double_dot_not_spinner():
+    """A bare ``··`` line (e.g. a separator) is also rejected."""
+    pane = _pane("··")
+    assert parse_pane(pane) is None
+
+
 def test_idle_decoration_with_todos():
     """Completion summary can also carry the still-on-screen todo list."""
     pane = _pane(
