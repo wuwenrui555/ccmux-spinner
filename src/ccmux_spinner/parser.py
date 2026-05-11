@@ -142,6 +142,15 @@ def parse_pane(pane_text: str) -> Activity:
         stripped = line.strip()
         if stripped[0] not in _STATUS_SPINNERS:
             return None
+        # Defense against false positives where the glyph happens to
+        # match but the line is actually unrelated content rendered
+        # right above the chrome (e.g. a markdown ``**bold**`` line
+        # streamed into the terminal during a turn). A real status
+        # row is always ``<glyph> <body>`` with a space between, so
+        # require that. Single-glyph lines fall through to the
+        # ``not body`` check below.
+        if len(stripped) > 1 and not stripped[1].isspace():
+            return None
         body = stripped[1:].strip()
         if not body:
             return None
