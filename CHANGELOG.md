@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-05-11
+
+### Added
+
+- `SpinnerMonitor.current` property: the most recently classified
+  `Activity` from the poll loop, regardless of whether it was
+  emitted to the iterator (the iterator coalesces unchanged
+  classifications). Useful for one-shot "what's the spinner state
+  right now" queries.
+- `SpinnerMonitor.last_pane_change_at` property: Unix epoch of the
+  most recent poll where the raw captured pane text differed from
+  the previous poll. Finer-grained than Activity-change emission;
+  consumers can use `time.time() - last_pane_change_at` to detect
+  static panes during periods when no Activity transition fired.
+
+Both fields are additive — existing consumers (only the
+`ccmux-spinner watch` CLI as of this writing) ignore them.
+
+Motivation: ccmux-core's grace timer needs to distinguish "spinner
+absent because pane is streaming new content" (don't fire) from
+"spinner absent and pane is static" (fire interrupted). Activity
+classification alone cannot — both cases yield `None`. The new
+`last_pane_change_at` signal closes that gap by exposing whether
+the underlying pane is changing at all.
+
 ## [0.2.0] - 2026-05-10
 
 ### Changed (BREAKING)
