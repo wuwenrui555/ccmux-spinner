@@ -228,9 +228,9 @@ async def test_last_pane_change_at_stable_when_pane_unchanged():
             assert t1 > 0
             await asyncio.sleep(0.15)  # plenty of polls, but pane never changes
             t2 = mon.last_pane_change_at
-            assert (
-                t2 == t1
-            ), "last_pane_change_at must not advance while raw pane text is unchanged"
+            assert t2 == t1, (
+                "last_pane_change_at must not advance while raw pane text is unchanged"
+            )
 
 
 @pytest.mark.asyncio
