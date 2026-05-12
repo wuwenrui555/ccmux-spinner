@@ -1,6 +1,6 @@
 [project]
 name = "ccmux-spinner"
-version = "0.2.1"
+version = "0.2.2"
 description = "Capture the live spinner / completion summary from a Claude Code tmux pane."
 readme = "README.md"
 requires-python = ">=3.11"

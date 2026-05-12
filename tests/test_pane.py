@@ -168,11 +168,19 @@ def test_capture_pane_success():
     with patch("ccmux_spinner.pane.subprocess.run", return_value=_R()) as m:
         out = capture_pane("%80")
         assert out == "hello world\n"
-        # Verify we used -p -J -t and the pane id.
         args = m.call_args[0][0]
-        assert args[:3] == ["tmux", "capture-pane", "-p"]
-        assert "-J" in args
-        assert "%80" in args
+        assert args == [
+            "tmux",
+            "capture-pane",
+            "-p",
+            "-J",
+            "-t",
+            "%80",
+            "-S",
+            "-200",
+            "-E",
+            "-",
+        ]
 
 
 def test_capture_pane_failure_raises():
