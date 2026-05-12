@@ -140,17 +140,38 @@ def resolve_active_pane_id(tmux_session: str) -> str:
 
 
 def capture_pane(pane_id: str) -> str:
-    """Capture the visible content of a tmux pane.
+    """Capture the contents of a tmux pane (defensive tail).
 
-    Uses ``tmux capture-pane -p -J -t <pane_id>``. ``-J`` joins
-    wrapped lines so the ``────`` chrome separator survives wrapping.
+    Uses ``tmux capture-pane -p -J -t <pane_id> -S -200 -E -``:
+
+    * ``-J`` joins wrapped lines so the ``────`` chrome separator
+      survives wrapping.
+    * ``-S -200 -E -`` pins the capture to the buffer tail (200
+      lines of history through the active-screen end), independent
+      of whether the user is in copy mode. The default flags would
+      return only the visible region, which is normally the same
+      as the active-screen tail but degrades in edge cases (very
+      small panes, cross-platform tmux variants, future multi-row
+      TUI patterns).
+
     No ``-e``: ANSI escapes are stripped.
 
     Raises :class:`PaneCaptureError` on failure.
     """
     try:
         result = subprocess.run(
-            ["tmux", "capture-pane", "-p", "-J", "-t", pane_id],
+            [
+                "tmux",
+                "capture-pane",
+                "-p",
+                "-J",
+                "-t",
+                pane_id,
+                "-S",
+                "-200",
+                "-E",
+                "-",
+            ],
             capture_output=True,
             text=True,
             check=False,
